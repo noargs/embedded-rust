@@ -2,10 +2,12 @@
 // 2. define the reset handler for the mcu
 // 3. define the panic handler i.e. exception handler for the mcu
 
+#[unsafe(no_mangle)]
 fn reset_handler() {
   // 1. copy the .data section from flash to ram
 
   // 2. zero out the .bss section in ram
 
   // 3. call the main function
+  crate::main();
 }

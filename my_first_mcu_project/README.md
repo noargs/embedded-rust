@@ -207,7 +207,7 @@ A linker script is a text file used by the linker to control the layout of the o
 ## Linker flags.      
 Add this entry to **.cargo/config.toml** file of your project.     
 **Uses default linker (rust-lld)**    
-```ld
+```toml
 [target.thumbv7m-none-eabi]
 rustflags = [
   "-C", "link-arg=-Tmemory.ld"
@@ -216,7 +216,7 @@ rustflags = [
 * `memory.ld` is your linker script file.      
     
 **Uses external linker**.      
-```ld
+```toml
 [target.thumbv7m-none-eabi]
 linker = "arm-none-eabi-ld"
 rustflags = [
@@ -225,10 +225,267 @@ rustflags = [
 ```      
 - [More info on LLD of LLVM](https://lld.llvm.org/ELF/linker_script.html)     
 - LLD implements a large subset of the GNU ld linker script notation as they are documented in ld [manual](https://sourceware.org/binutils/docs/ld/Scripts.html).     
-- You can also refer to GNU linker [documentation](https://ftp.gni.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_toc.html#TOC5) as it is compatible with LLVM linker       
+- You can also refer to GNU linker [documentation](https://ftp.gni.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_toc.html#TOC5) as it is compatible with LLVM linker     
+
+## Important Linker scripts commands           
+| Command  | Meaning |   
+|----------|---------|  
+| MEMORY | Defines memory regions available on the target device. |     
+| SECTIONS | Tells the linker how input sections are mapped to output sections and placed in memory |     
+| ENTRY | Specifies the entry point of the program |     
+| OUTPUT | Specifies the name of the output file |     
+| PROVIDE | Defines a symbol if it is not already defined |     
+| ASSERT | Tests an assertion and stops linking if false |     
+| KEEP | Ensures that the linker retains the specified sections |     
+| AT | Specifies a different load address for a section |     
+| ALIGN | Aligns the current location to a specified boundary |     
+| LOADADDR(section) | Returns the absolute load address of the section |     
+| SIZEOF | Returns the size of a section |     
+| ORIGIN | Returns the origin address of a memory region |     
+| LENGTH | Returns the length of a memory region |      
+
+- For more info refer: https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_3.html#SEC6     
+
+![System and memory overview of STM32F303xB/C](../imgs/02.png)       
+   
+
+## Memory layout attributes        
+```ld
+MEMORY
+{
+  FLASH (rx)    : ORIGIN = 0x08000000, LENGTH = 256K
+  RAM (rwx)     : ORIGIN = Ox20000000, LENGTH = 64K
+  CCMRAM (rwx)  : ORIGIN = 0x10000000, LENGTH = 64K
+
+  /*non volatile data even powered off i.e. calibration, constants, config settings*/
+  /* EEPROM (rwx)  : ORIGIN = 0x08080000, LENGTH = 4K */ 
+  /* Battery backed RAM*/
+  /* BATTRAM (rw)  : ORIGIN = 0x40024000, LENGTH = 4k */
+}
+```          
+   
+• Attributes i.e. (rwx) in a linker script specify the intended use of memory regions (e.g., read-only, writable, executable). They guide the linker in placing sections appropriately, especially for sections not explicitly listed in the script.   
+     
+• Attributes ensure that sections are placed in memory regions that match their required characteristics, helping to avoid incorrect memory usage and potential runtime errors.    
     
+## Different types of data of a program      
+A program contains various kinds of data, which can be categorized based on their storage location, mutability, and initialization state      
+- Read-only data        
+- Initialized data      
+- Uninitialized data     
+- Stack and heap data      
 
+### Read-only data (.rodata)       
+**Do not consume RAM space**   
+- String literals      
+- Constant variables (const)     
+- Static immutable variables      
+- Stored in ROM or Flash memory    
+    
+```rust
+const PI: f64 = 3.141592653589793;         // constant variable
+const NUMBERS: [i32; 5] = [1, 2, 3, 4, 5]; // constant array
+static SCORES_GLOBAL: [i32; 5] = [1, 2, 3, 4, 5]; // static immutable array 
 
+fn main() {
+  let message = "This is a string literal."  // string literal
+}
+```      
+    
+```ld
+.rodata :
+{
 
- 
+} > FLASH
+```     
+    
+**You can mention `AT` here i.e. `> FLASH AT> FLASH`. However redundant here as you use `AT` only when load address different than execution address**
+      
+      
+### Initialised data (.data)     
+**Rust does not have a separate concept of global variables as seen in some other languages. Global variables are handled through static variables**        
+**Consume both ROM and RAM**       
+- Initiliased static mut variables (global variables) .data      
+- Initialised local variables (stack)      
+- .data section is always part of the ROM and at runtime, are copied from ROM to RAM, where the program can modify them.     
+      
+```rust
+// (Initiailzed global variable, data section)
+static mut GLOBAL_COUNTER: 132 = 1;
 
+fn main() {
+  let local_var: 132 = 42; // Initialized local variable (stack)
+
+  unsafe {
+  // modifying global variable is unsafe in rust
+  GLOBAL_COUNTER += 1;
+  printin! ("Global counter: {}", GLOBAL_COUNTER);
+}
+```     
+
+> [!NOTE]      
+> Here, RAM address is also called as **Virtual Memory Address** (VMA). This is the address where the section is loaded in RAM at runtime      
+> FLASH address is also called as **Load Memory Address(LMA)**. This is the address where the section is stored in FLASH initially before being copied to RAM during startup       
+
+```ld
+.data :
+{
+
+} > RAM AT> FLASH
+```    
+**Use `AT` only when load address is different than executiona address**
+       
+     
+### Unintialised data (.bss)        
+**ROM just stores size information of the .bss section RAM stores entire .bss section**
+• Uninitialized global variables.
+• Uninitialized static variables.
+• Uninitialized static mut variables (typically zero-initialized).
+• These data consume no significance space in the ROM, only metadata indicating the size of the .bs section. During runtime the startup code zeros out the .bass section in RAM      
+     
+```rust     
+// This would go into the BSS section
+static mut UNINITIALIZED_ARRAY: [u8; 1024] = [0; 1024];
+fn main() -> ! {
+  unsafe {
+    UNINITIALIZED_ARRAY [0] = 1;
+  }   
+}
+```          
+      
+### Stack:
+• Local variables.
+• Function call management (return addresses parameters).        
+     
+### Heap:
+• Dynamically allocated memory (using Box, Vec, etc., in Rust).      
+      
+```rust
+fn main() {
+  // 42 is stored in heap during runtime
+  let heap_allocated_data = Box::new (42);
+  
+  // [1, 2, 3, 4, 5] is stored in heap during runtime
+  let vec_of_numbers = vec![1, 2, 3, 4, 5];
+}     
+```        
+     
+![Merging sections](../imgs/03.png)          
+      
+
+## Location counter ('.')      
+• The location counter (.) represents the current memory address within the section being processed.    
+• As the linker processes the sections defined in the SECTIONS command, it automatically updates the location counter to reflect the current position in memory.      
+• You can use the location counter to define the start or end of sections or to create gaps between sections by manipulating its value.     
+    
+- Below `_sdata` or `_sbss` (start data/bss) are linker symbols not variables    
+    
+```ld
+  .data :
+  {
+  _sidata = LOADADDR(.data);   /* This returns the FLAS (LMA) of the .data section */
+    _sdata = .;        /* start of data section in VMA(RAM) */
+    *(.data)
+    *(.data*)
+    _edata = .;
+  } > RAM AT> FLASH
+
+  /* uninitialised data will be RAM */
+  .bss : 
+  {
+    _sbss = .;
+    *(.bss)
+    *(.bss*)  
+    _ebss = .;  
+  } > RAM
+```       
+     
+![Code memory(FLASH), Data memory(SRAM)](../imgs/04.png) 
+
+### ALIGN(n)        
+    
+- Aligns the location counter to the next multiple of n bytes
+  Example:
+  ALIGN(4) => location counter is adjusted to the next address that is a multiple of 4. If the current address is already aligned to 4 bytes, it remains unchanged.       
+  
+- ALIGN ensures that your code and data sections are correctly placed at their natural and appropriate memory boundaries, preventing misalignment and potential faults      
+      
+```
+SECTIONS
+{
+  .text :
+  {
+    /* . = 0x0800 0000 */
+    . = ALIGN(4);
+    /* here you should collect all executable code */
+    *(.text)
+    *(.text*)
+    . = ALIGN(4);
+  } > FLASH
+
+  .rodata :
+  {
+    . = ALIGN(4);
+    ...
+    . = ALIGN(4);
+
+  } > FLASH
+
+  .data :
+  {
+    _sidata = LOADADDR(.data);   /* This returns the FLASH (LMA) of the .data section */
+    . = ALIGN(4);
+    _sdata = .;        /* start of data section in VMA(RAM) */
+    *(.data)
+    *(.data*)
+    . = ALIGN(4);
+    _edata = .;
+  } > RAM AT> FLASH
+
+  /* uninitialised data will be RAM */
+  .bss : 
+  {
+    . = ALIGN(4);
+    _sbss = .;
+    ...
+    . = ALIGN(4);
+    _ebss = .;  
+  } > RAM
+}
+```
+      
+### RAM usage check with the help of linker       
+We reserver 1Kb for Stack and 1kb for heap. If the location counter goes beyond the maximum RAM size, the linker could throw error.    
+```ld
+  .ram_usage_check :
+  {
+    . = ALIGN(8);
+    . = . + _min_stack_size;   /* 1kb = 1024bytes = 0x400 */
+    . = . + _min_heap_size;
+    . = ALIGN(8);
+  } > RAM   
+```
+
+![Initialise the Initial Stack pointer](../imgs/05.png)     
+     
+> [!NOTE]       
+> In ARM Cortex Mx processor, the stack pointer is aligned to 8 byte boundary. Because 8 byte boundary alignment is important during push and pop operations.    
+> For example, consider a situation of pushing and popping a 64 bit data like double or long long. So there are 64 bit data types, and these data types should be stored at addresses that are multiples of 8 bytes for efficient access. And also 8 byte alignment inherently includes 8 byte alignment as well. 
+> We have used `ALIGN(8)` in `.ram_usage_check` section       
+      
+## Test our program     
+```bash
+$ cargo clean
+$ cargo build
+$ cargo objdump -- -h target/thumbv7em-none-eabhif/debug/my_first_mcu_project
+
+# ## ELF file inspection ##
+# print all details of the ELF file
+$ cargo readobj -- -all <elf file>
+
+# print the contents of each section in an ELF file
+$ cargo readobj -- -x .data|.rodata|.text <elf file>
+
+# display the Symbol table
+$ cargo readobj -- -s <elf file>
+```
