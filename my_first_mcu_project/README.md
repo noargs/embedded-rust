@@ -488,4 +488,43 @@ $ cargo readobj -- -x .data|.rodata|.text <elf file>
 
 # display the Symbol table
 $ cargo readobj -- -s <elf file>
-```
+```        
+       
+# Startup code typically includes         
+1. Vector table      
+  • Defines the initial stack pointer and the addresses of interrupt and exception handlers
+2. Reset Handler       
+  • This is the entry point to our program which initializes the hardware and sets up the runtime environment
+3. Exception handlers      
+   
+## Vector table         
+The vector table is a collection of addresses that point to **Interrupt Service Routines (ISRs)** and **exception handlers**. The processor looks for this table at a specific, well-defined address in memory, usually at the beginning of the code space (often address 0x00000000 in many microcontroller architectures).       
+     
+### Vector table placement       
+![Vector table placement](../imgs/06.png)          
+     
+### Exceptions & interrupts in STM32F303xB/C MCU        
+![Exceptions and interrupts](../imgs/07.png)         
+      
+> [!NOTE]        
+> You don't have populate vector table in the `startup_stm32f303.rs` manually, instead use **svd-vector-gen** tool    
+> Visit rust [crate](https://crates.io/crates/svd-vector-gen) and for STM32 microcontrollers, you can obtain SVD files by installing [STM32CubeCLT](https://www.st.com/en/development-tools/stm32cubeclt.html)      
+> In MacOSx you can install however you don't find the installation directory as in window where you go to `C:\ST\STM32CubeCLT_1.16.0\STMicroelectronics_CMSIS_SVD`, the alternative is to download the svd from [github](https://github.com/modm-io/cmsis-svd-stm32) for STM32F303 and paste unto your project `my_first_mcu_project` root directory     
+> Now install crate and run following command        
+> `$ cargo install svd-vector-gen` and `$ svd-vector-gen`. This will generate `vector_STM32F303.txt` and `device_STM32F303.x`      
+      
+![VECTOR_TABLE array](../imgs/08.png)     
+
+## extern "C"
+• When you use extern "C" in rust, you are telling the rust compiler to generate function call code that conforms to the C ABI on the target platform.      
+This includes:    
+  • Parameter passing conventions.    
+  • Stack frame setup and teardown. (prologue/epilogue)     
+  • Return value handling.     
+  
+• When targeting ARM with thumbv7em-none-eabi, using extern "C" ensures that the function will conform to the ARM EABI's implementation of the C ABI, making it compatible with other C code or system components compiled with ARM EABI.        
+
+
+        
+
+              
