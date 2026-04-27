@@ -17,7 +17,9 @@
 | Arm Cortex-M0+ | Armv6-M | `thumbv6m-none-eabi` | 
 | Arm Cortex-M3  | Armv7-M | `thumbv7m-none-eabi` | 
 | Arm Cortex-M4     | Armv7E-M | `thumbv7em-none-eabi`, or `-eabihf` |
-| Arm Cortex-M7     | Armv7E-M | `thumbv7em-none-eabi`, or `-eabihf` | 
+| Arm Cortex-M7     | Armv7E-M | `thumbv7em-none-eabi`, or `-eabihf` |       
+       
+` rustup target add thumbv7em-none-eabihf`       
 
 `cargo build --target thumbv7em-none-eabihf`    
    
@@ -84,10 +86,7 @@ running following code will give us **error: `#[panic_handler]` function require
 ```rust
 #![no_std]
 fn main() {
-    
-    loop{
-
-    }
+  loop{ }
 }
 ```    
     
@@ -160,10 +159,11 @@ It either:
     
 ## ELF file inspection
 ![ELF](../imgs/01.png)     
-   
-Make sure you have **cargo-binutils** installed and the necessary components.     
-`cargo install cargo-binutils`      
-`rustup component add llvm-tools-preview`.      
+    
+> [!IMPORTANT]          
+> Make sure you have **cargo-binutils** installed and the necessary components.     
+> `cargo install cargo-binutils`      
+> `rustup component add llvm-tools-preview`.      
     
 - **cargo objdump -- -h <elf file>** Provides a high-level overview of the sections in the ELF file, including their sizes and addresses.     
     
@@ -524,6 +524,18 @@ This includes:
   
 • When targeting ARM with thumbv7em-none-eabi, using extern "C" ensures that the function will conform to the ARM EABI's implementation of the C ABI, making it compatible with other C code or system components compiled with ARM EABI.        
 
+## Calling convention         
+- calling convention refers to the rules that define how functions receive parameters, return values, and how the stack is managed during a function call.         
+     
+It dictates,  
+- **Parameter passing**: which registers or stack lcoations are used to pass function arguments.      
+- **Return values**: where the return value is placed (usually in a specific register)         
+- **Stack management**: how the stack frame is set up and torn down, including how the return address is store and retrieved.      
+   
+**The calling convention ensures that function calls are consistent, so that the caller and callee agree on how data is passed and managed during the call.               
+      
+## Why extern "C" is mandatory for interrupt handlers?           
+The ARM Cortex-M processors, commonly used in embedded systems, follow the ARM Embedded ABI (EABI) which is closely related to the C ABI. The EABI specifies how functions should be compiled, including the layout of the stack frame, register usage, and more. By using extern "C", you ensure that teh interrupt handler is compiled to match the ARM EABI expectations      
 
         
 
