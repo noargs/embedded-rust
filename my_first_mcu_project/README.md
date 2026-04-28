@@ -1,17 +1,101 @@
-### VS code extensions     
+## VS code extensions     
 - rust     
--           
+- rust sytax (if doesn't come with rust extension)
+- cortex-debug    
+
+## MCU specific       
+STM32CubeCLT(Tools for Third party IDEs) 
+- In MacOSx you can find it in `/opt/ST/STM32CubeCLT_1.21.0`     
+
+## Cortext-debug (VScode extension settings)      
+You have to intergrate the cortex-debug VS code extension with **STM32CubeCLT**.    
+- Go to VS code's Extension tab, click cortex-debug and click settings icon and go to **Settings**     
+
+### Click **Cortex-Debug** and **External: GNU Tools** and write followings   
+1- Click **Cortex-Debug: Arm Toolchain path** > **Edit in settings.json** as `"cortex-debug.armToolchainPath": "/opt/ST/STM32CubeCLT_1.21.0/GNU-tools-for-STM32/bin",`      
+2- Click **Cortex-Debug: Arm Toolchain prefix** > **Edit in settings.json** as `"cortex-debug.armToolchainPrefix": "arm-none-eabi"`   
+
+### Click **Cortex-Debug** and **External: GDB Servers** and write followings       
+1- Click **Cortex-Debug: Stlink path > **Edit in settings.json** as `"cortex-debug.stlinkPath": "/opt/ST/STM32CubeCLT_1.21.0/STLink-gdb-server/bin/ST-LINK_gdbserver",`      
+     
+> [!IMPORTANT]     
+> remove **.osx** at the end of `"cortex-debug.armToolchainPath"` and `"cortex-debug.stlinkPath"`    
+
+### Go to Settings > Open Settings (JSON)     
+And also type in `svdFile` and `svdPath`. Your settings json should look like following:      
+```json
+  "cortex-debug.armToolchainPath": "/opt/ST/STM32CubeCLT_1.21.0/GNU-tools-for-STM32/bin",
+  "cortex-debug.stlinkPath": "/opt/ST/STM32CubeCLT_1.21.0/STLink-gdb-server/bin/ST-LINK_gdbserver",
+  "cortex-debug.armToolchainPrefix": "arm-none-eabi",
+  "svdFile" : "STM32F303.svd",
+  "svdPath" : "/opt/ST/STM32CubeCLT_1.21.0/STMicroelectronics_CMSIS_SVD",
+```      
+    
+## Configure Tasks      
+In VS code go to menu **Terminal** > **Configure Task...** and type `cargo build` and hit enter. That will create **tasks.json** with the following content      
+```json
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cargo",
+			"command": "build",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "build",
+			"label": "rust: cargo build[MCU]"
+		}
+	]
+}
+```   
+Change the **label** from `"rust: cargo build"` to `"rust: cargo build[MCU]"` to distinguish your created tasks from other     
+
+> [!NOTE]     
+> Shortcut to run the task **CMD + Shift + P** and click or type in **Tasks: Run task** and it will show the label of your task as well as **rust: cargo build[MCU]**       
+    
+## Create launch option      
+Click play button in VS code and click **create a launch.json file** and select **Cortex Debug** which will create **launch.json** and that should look like following; you should include `"svdFile"` and `"device"` as well. And also add the **pre launch task**, a task you created previously.    
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+
+    {
+      "name": "Cortex Debug",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/target/thumbv7em-none-eabihf/debug/my_first_mcu_project",
+      "request": "launch",
+      "type": "cortex-debug",
+      "runToEntryPoint": "main",
+      "servertype": "stlink",
+      "svdFile" : "/opt/ST/STM32CubeCLT_1.21.0/STMicroelectronics_CMSIS_SVD/STM32F303.svd",
+      "device" : "STM32F303",
+      "preLaunchTask": "rust: cargo build[MCU]",
+      "showDevDebugOutput": "raw"
+    }
+  ]
+}
+```  
+   
+## Run the program     
+In VS code menu click **Run** and click **Start debugging**          
+       
+## To inspect binaries (ELF)           
+**cargo-binutils**     
+- `cargo install cargo-binutils`      
+- `rustup component add llvm-tools-preview`.  
 
     
-### Creare project     
+## Creare project     
 `cargo new my_first_mcu_project`    
    
 
-### Build project (native compilation, same host+target) 
+## Build project (native compilation, same host+target) 
 `cargo build`      
      
 
-### Build project (cross compilation, for different target)           
+## Build project (cross compilation, for different target)           
 - find the target first with `rustup target list`     
 
 | ARM Cortex Mx Processor  | Architecture | `rustup target list` |  
@@ -561,7 +645,7 @@ In our mcu, we have 40Kb of RAM. 40Kb x 1024 = 40960 to hex A000 as mcu is in li
 First address i.e. *37030008* of the vector table must be the address of `Reset_Handler`      
 To find out the address of particular symbol. we can read the symbol table by `cargo readobj -- -s target/thumbv7em-none-eabihf/debug/my_first_mcu_project`. You reverse the above address from *3703 0008* to *0800 0337* and you will find the in readobj command with -s flag as follows        
    
-![Symbol table output](../imgs/010.png)      
+![Symbol table output](../imgs/10.png)      
    
 In startup code we are left with **Reset Handler** as shown below      
    
@@ -652,7 +736,22 @@ println!("{}", val);
 6. No reference counting: Unlike Rc<T> or Arc<T>, raw pointers don't keep track of references.      
 7. No runtime borrow checking: Unlike RefCell<T>, raw pointers don't check borrowing rules at runtime.     
 8. Direct risk of undefined behavior     
-11.No Thread-Safety guarantees   
+11.No Thread-Safety guarantees     
+     
+# Flash and Debug       
+To flash and debug the elf for STM32 mcu, you need a debugger, either onboard or offboard, such as ST-Link, J-Link, or a JTAG debugger.     
+      
+![Flash & Debug](../imgs/13.png)   
+    
+## Programming Fastbit STM32 Nano board     
+Fastbit STM32 Nano board can be programmed in two ways:     
+- To flash and debug, you can use **ST-Link** externally connected to the board      
+- To program the board, **UART**, without debugging capability then you can connect the board to the host pc via a usb cable as board already has on-board virtual com support. So the moment you connect this board to the pc the board will enumerate as virtual com.    
+     
+![Programming Fastbit STM32 Nano board](../imgs/14.png)       
+
+
+   
 
 
    
