@@ -1,3 +1,6 @@
+### VS code extensions     
+- rust     
+-           
 
     
 ### Creare project     
@@ -535,7 +538,124 @@ It dictates,
 **The calling convention ensures that function calls are consistent, so that the caller and callee agree on how data is passed and managed during the call.               
       
 ## Why extern "C" is mandatory for interrupt handlers?           
-The ARM Cortex-M processors, commonly used in embedded systems, follow the ARM Embedded ABI (EABI) which is closely related to the C ABI. The EABI specifies how functions should be compiled, including the layout of the stack frame, register usage, and more. By using extern "C", you ensure that teh interrupt handler is compiled to match the ARM EABI expectations      
+The ARM Cortex-M processors, commonly used in embedded systems, follow the ARM Embedded ABI (EABI) which is closely related to the C ABI. The EABI specifies how functions should be compiled, including the layout of the stack frame, register usage, and more. By using extern "C", you ensure that teh interrupt handler is compiled to match the ARM EABI expectations    
+
+## PROVIDE();
+**PROVIDE** directive in a linker script can be used to define a symbol as an alias for another symbol to as a fallback or default definition until an actual definition is provided elsewhere in the project.    
+    
+`PROVIDE(TIM1_isr = default_handler);`     
+    
+If the `TIM1_isr` is not defined elsewhere in your code, it will default to `default_handler`.        
+      
+It guarantees that the vector table will always have a valid function pointer for each interrupt, avoiding the scenario where an unhandled interrupt leads to undefined behavior  
+   
+> [!NOTE]         
+> Once you add all the enteries to the linker script `memory.ld` as `PROVIDE(MemManage_Handler = Default_Handler);` or `INCLUDE "device_STM32F303.x"`. Now you can re-run the `cargo build`    
+> And inspect the `.text` by `cargo readobj -- -x .text target/thumbv7em-none-eabihf/debug/my_first_mcu_project`       
+     
+### Top of the stack     
+In our mcu, we have 40Kb of RAM. 40Kb x 1024 = 40960 to hex A000 as mcu is in little endian format hence, picture below, reverse the bytes i.e. 00a0 to a000    
+      
+![.text section](../imgs/09.png)     
+    
+First address i.e. *37030008* of the vector table must be the address of `Reset_Handler`      
+To find out the address of particular symbol. we can read the symbol table by `cargo readobj -- -s target/thumbv7em-none-eabihf/debug/my_first_mcu_project`. You reverse the above address from *3703 0008* to *0800 0337* and you will find the in readobj command with -s flag as follows        
+   
+![Symbol table output](../imgs/010.png)      
+   
+In startup code we are left with **Reset Handler** as shown below      
+   
+### Startup code typically includes      
+✅ 1. **Vector table**
+  • Defines the initial stack pointer and the addresses of interrupt and exception handlers       
+2. **Reset Handler** • This is the entry point to our program which initializes the hardware and sets up the runtime environment       
+✅ 3. **Exception handlers**    
+
+## Reset Handler       
+As we previously seen, we have to copy the data section **.data**, which is stored in the flash memory to the SRAM that is the data memory.     
+And then we also have to make space for the **.bss** variables and initialize them to zero in the SRAM.    
+We already defined these linker symbols `_sdata`, `_edata`, `_sbss`, `_ebss` in the linker script. Now we have to make use of these linker symbols, and copy the data section from Flash to the SRAM.       
+     
+![Code memory(FLASH), Data memory(SRAM)](../imgs/04.png)  
+    
+We will reference the linker symbols in the rust code with **extern**
+```rust
+unsafe extern "C" {
+    unsafe static _sidata: u32;   /* start of .data in flash */
+    unsafe static _sdata: u32;    /* start of .data in ram */
+    unsafe static _edata: u32;    /* end of .data in ram */
+    unsafe static _sbss: u32;     /* start of .bss in ram */
+    unsafe static _ebss: u32;     /* end of .bss in ram */
+}
+```  
+     
+![Addresses represents by linker symbols](../imgs/11.png)   
+
+To manipulate the addresses represented by linker symbol like `_sdata` etc, we created the static variables in the rust using **extern** block as shown above.     
+     
+## Raw pointers      
+Raw pointers in rust (`*const T` and `*mut T`) do not adhere to the borrowing rules, data race prevention mechanisms, or other safety guarantees enforced by the Rust compiler for references (`&T` and `&mut T`). It is up to the programmer to ensure that raw pointer usage is safe.
+You need to use an unsafe block to dereference raw pointers (`*const T` and `*mut T`)     
+    
+## Types of raw pointers     
+1. Immutable raw pointer (*const T):    
+This is a raw pointer used to point to data where the intention is that the data should not be modified through this pointer. It is similar in concept to a "const pointer" in languages like C and C++.      
+    
+2. Mutable raw pointer (*mut T):      
+This raw pointer allows for mutation of the data it points to.      
+    
+> [!Note]    
+> The data pointed to by a **const T** is not inherently constant or immutable in itself; rather, **const T** is a way to express the intent that the data should not be modified through this pionter.
+    
+### Comparison of pointers of C with Rust     
+```rust  
+// in C
+int val = 10;
+int *ptr_to_val = &val;
+*ptr_to_val = 20;   
+
+// in rust
+let mut val = 10;
+
+// `&mut val` -> mutable borrow of the `val` i.e. reference in safe rust
+// now reference (i.e. &mut val) typecasted explicitly to raw pointer `as *mut i32`
+let ptr_to_val = &mut val as *mut i32;
+unsafe { *ptr_to_val = 20; }
+
+println!("{}", val);
+
+// in C immutable pointer
+const int val = 10;
+const int *ptr_to_val = &val; 
+*ptr_to_val = 20; // Error 
+
+// in rust immutable pointer
+let val = 10;
+let ptr_to_val: *const i32 = &val;  // immutable raw pointer
+unsafe { *ptr_to_val = 20; }
+
+println!("{}", val);
+```    
+![Raw pointers](../imgs/12.png)   
+
+> [!NOTE]     
+> In an instance where you have global mutable variable like `static mut _sdata: i32 = 100;` and you typecast it into raw pointer like `let mutable_raw_pointer = &mut _sdata as *mut i32;`, you will get warning and possible error in the **2024 edition** that state; *creating a mutable reference to mutable static is discouraged*      
+> you have to use macro `addr_of_mut` for mutable and `addr_of` for immutable from **std** library or in our case from **core** `use core::ptr` and then `let mutable_raw_pointer = ptr::addr_of_mut!(_sdata);`  
+> These macros help you to create the immutable raw pointer instead of doing casting etc by yourself  
+   
+### What raw pointers lack compared to smart pointers in Rust?       
+1. No safety guarantees: Dereferencing raw pointers is inherently unsafe.        
+2. No automatic memory management: Raw pointers don't manage memory allocation or deallocation.       
+3. No borrowing and ownership enforcement: Raw pointers bypass rust's ownership and borrowing rules.       
+4. No Lifetimes: Raw pointers don't enforce lifetimes, risking dangling pointers.       
+5. Potential for data races: Multiple mutable raw pointers can point to the same location without checks.       
+6. No reference counting: Unlike Rc<T> or Arc<T>, raw pointers don't keep track of references.      
+7. No runtime borrow checking: Unlike RefCell<T>, raw pointers don't check borrowing rules at runtime.     
+8. Direct risk of undefined behavior     
+11.No Thread-Safety guarantees   
+
+
+   
 
         
 

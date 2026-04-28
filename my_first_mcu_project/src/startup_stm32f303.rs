@@ -1,3 +1,5 @@
+use core::ptr;
+
 // 1. define the vector table for the mcu
 // 2. define the reset handler for the mcu
 // 3. define the panic handler i.e. exception handler for the mcu
@@ -198,12 +200,40 @@ static VECTOR_TABLE: [Option<unsafe extern "C" fn()>; 100] = [
     Some(SPI4_Handler),
 ];
 
+unsafe extern "C" {
+    unsafe static _sidata: u32;   /* start of .data in flash */
+    unsafe static mut _sdata: u32;    /* start of .data in ram */
+    unsafe static mut _edata: u32;    /* end of .data in ram */
+    unsafe static mut _sbss: u32;     /* start of .bss in ram */
+    unsafe static mut _ebss: u32;     /* end of .bss in ram */
+}
+
 #[unsafe(no_mangle)]
 extern "C" fn reset_handler() {
-  // 1. copy the .data section from flash to ram
 
-  // 2. zero out the .bss section in ram
+    // 1. copy the .data section from flash to ram
+    let mut src_is_flash = ptr::addr_of!(_sidata ); 
+    let mut dest_is_ram = ptr::addr_of_mut!(_sdata);  
+    let data_end_in_ram = ptr::addr_of_mut!(_edata); 
 
-  // 3. call the main function
-  crate::main();
+    while dest_is_ram < data_end_in_ram {
+        unsafe { 
+            *dest_is_ram = *src_is_flash;
+            dest_is_ram = dest_is_ram.add(1);
+            src_is_flash = src_is_flash.add(1);
+        };
+    }
+
+    // 2. zero out the .bss section in ram
+    let mut bss_start = ptr::addr_of_mut!(_sbss);
+    let bss_end = ptr::addr_of_mut!(_ebss);
+    while bss_start < bss_end {
+        unsafe {
+            *bss_start = 0;
+            bss_start = bss_start.add(1);
+        }
+    }
+    
+    // 3. call the main function
+    crate::main();
 }

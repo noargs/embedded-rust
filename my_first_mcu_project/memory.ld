@@ -40,6 +40,8 @@ SECTIONS
   {
     /* . = 0x0800 0000 */
     . = ALIGN(4);
+    LONG(_start_of_stack);
+    KEEP(*(.isr_vector));
     /* here you should collect all executable code */
     *(.text)
     *(.text*)
@@ -84,3 +86,5 @@ SECTIONS
     . = . + _min_heap_size;
   } > RAM
 }
+
+INCLUDE "device_STM32F303.x"
