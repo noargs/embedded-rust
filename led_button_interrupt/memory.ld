@@ -13,16 +13,16 @@ MEMORY
 }
 
 _start_of_stack = ORIGIN(RAM) + LENGTH(RAM);
-_min_stack_size = 0x400       /* 1kb = 1024 bytes = 0x400 */
-_min_heap_size  = 0x400
+_min_stack_size = 0x400;       /* 1kb = 1024 bytes = 0x400 */
+_min_heap_size  = 0x400;
 
 /*
- * SECTOINS command in a linker script specifies where each
+ * SECTIONS command in a linker script specifies where each
  * section (e.g, .text, .data, .bss) should be placed in 
  * in memory
  */
 
-SECTOINS
+SECTIONS
 {
   /*
    * 1. defines where each program section is placed in the 

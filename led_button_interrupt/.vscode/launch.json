@@ -13,7 +13,10 @@
       "type": "cortex-debug",
       "runToEntryPoint": "main",
       "servertype": "stlink",
-      "svdFile" : "/opt/ST/STM32CubeCLT_1.21.0/STMicroelectronics_CMSIS_SVD/STM32F303.svd",
+      // for macosx
+      // "svdFile" : "/opt/ST/STM32CubeCLT_1.21.0/STMicroelectronics_CMSIS_SVD/STM32F303.svd",
+      // for windows
+      "svdFile" : "C:\\ST\\STM32CubeCLT_1.21.0\\STMicroelectronics_CMSIS_SVD\\STM32F303.svd",
       "device" : "STM32F303",
       "preLaunchTask": "rust: cargo build[MCU]",
       "showDevDebugOutput": "raw"
