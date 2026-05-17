@@ -662,7 +662,31 @@ Fastbit STM32 Nano board can be programmed in two ways:
 - To flash and debug, you can use **ST-Link** externally connected to the board      
 - To program the board, **UART**, without debugging capability then you can connect the board to the host pc via a usb cable as board already has on-board virtual com support. So the moment you connect this board to the pc the board will enumerate as virtual com.    
      
-![Programming Fastbit STM32 Nano board](../imgs/14.png)       
+![Programming Fastbit STM32 Nano board](../imgs/14.png)     
+
+
+# Exercise -- 002      
+## Toggle LED State Using Button Interrupt      
+Create a bare-metal Rust program to toggle the state of an LED using a button interrupt on an STM32 microcontroller. Use raw pointer access to peripheral registers without relying on any external dependencies.       
+    
+### Steps:       
+1. Initialize GPIO pins for the LED (output) and button (input).          
+2. Configure the button for an external interrupt using EXTI.     
+3. Enable the corresponding interrupt in the NVIC.      
+4. Implement the Interrupt Service Routine (ISR) to toggle the LED       
+5. Set up the main function to initialize GPIO, EXTI, and NVIC configurations.      
+6. Test the program by flashing it to the microcontroller and verifying the LED toggles on button presses.    
+
+## Volatile read and write        
+- In bare- metal programming, the compiler might optimize out read and writes to memory-mapped peripheral registers if it thinks they have no side effects. To ensure that these operations are not optimized away, you can use **rust's volatile operations**, which tell the compiler that the memory access is important and should not be optimized out        
+- use `core::ptr::write_volatile` and `core::ptr::read_volatile` functions for peripheral register access       
+
+> [!IMPORTANT]              
+> The **!** operator's behavior varies based on its context (logical, bitwise, macro, or type usage)       
+> Logical NOT (**!**): Works only with boolean values.       
+> Bitwise NOT (**!**): Works only with integer values.     
+> **Rust does not support the `~` operator like in C**. 
+> `gpio_mode_reg_value &= !(mode_mask)`
 
 
    
