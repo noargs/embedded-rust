@@ -686,8 +686,13 @@ Create a bare-metal Rust program to toggle the state of an LED using a button in
 > Logical NOT (**!**): Works only with boolean values.       
 > Bitwise NOT (**!**): Works only with integer values.     
 > **Rust does not support the `~` operator like in C**. 
-> `gpio_mode_reg_value &= !(mode_mask)`
+> `gpio_mode_reg_value &= !(mode_mask)`             
+           
 
+## Run the code on the board     
+- You can do `Run > Start Debugging` or `Run > Run Without Debugging`  
+- Let's do `Run > Start Debugging` and do single stepping         
+![Board output](../imgs/15.png) 
 
    
 

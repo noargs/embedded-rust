@@ -1,11 +1,11 @@
 use core::ptr;
 
 pub unsafe fn read_register(addr: *mut u32) -> u32 {
-  ptr::read_volatile(addr)
+  unsafe { ptr::read_volatile(addr) }
 }
 
-pub unsafe fn write_register(addr: *mut u32, value: u32) {
-  ptr::write_volatile(addr, value)
+pub fn write_register(addr: *mut u32, value: u32) {
+  unsafe { ptr::write_volatile(addr, value) }
 }
 
 pub fn reg_set_bits(reg_addr: *mut u32, new_bits_val: u32, bit_position: u32, n_bits: u32) {
@@ -43,9 +43,7 @@ pub fn reg_set_bit(reg_addr: *mut u32, bit_position: u32, bit_value: bool) {
 }
 
 pub fn reg_set_val(reg_addr: *mut u32, new_reg_val: u32) {
-  unsafe {
     write_register(reg_addr, new_reg_val);
-  }
 }
 
 pub fn reg_read_bit(reg_addr: *mut u32, bit: u32) -> bool {
